@@ -10,7 +10,6 @@ HASAFS :=
 AFSQUOTA :=
 HASVXFS :=
 RPCLIBS := -lrpcsvc
-NORPC := -DNO_RPC
 EXTRAOBJ :=
 
 # Configuration based on OS
@@ -90,9 +89,7 @@ endif
 
 # Compiler and flags
 CC := gcc
-CFLAGS := -O2 -Wall $(EXTRAINC) $(NORPC)
-# TODO: REMOVE THIS IF POSSIBLE v
-CPPFLAGS := -O2 -Wall $(EXTRAINC) $(NORPC)
+CFLAGS := -O2 -Wall $(EXTRAINC)
 LDFLAGS := $(RPCLIBS) $(EXTRALIBS)
 OBJECTS := Quota.o stdio_wrap.o $(AFSQUOTA) $(PICOBJ) $(EXTRAOBJ)
 

@@ -1,14 +1,6 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
-/// #include "EXTERN.h"
-/// #include "perl.h"
-/// #include "XSUB.h"
-#ifdef __cplusplus
-}
-#endif
-
-#include <cerrno>
+#include <errno.h>
+#include <unistd.h>
+#include <stdio.h> 
 
 #include "myconfig.h"
 
@@ -350,19 +342,34 @@ xdr_ext_getquota_args(xdrs, objp)
 
 #endif /* !NO_RPC */
 
-/* -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
- *
- *  The Perl interface
- *
- */
-
 typedef struct {
-    uint64_t bc,bs,bh,bt,fc,fs,fh,ft;
-
+    uint64_t bc,
+             bs,
+             bh,
+             bt,
+             fc,
+             fs,
+             fh,
+             ft;
 } query_ret;
 
+typedef struct {
+    char *dev,
+         *path,
+         *type,
+         *opts;
+    // freemask stores which strings are "owned" by this object and need to be freed.
+    // 
+    // (freemask & (1 << 0)): dev
+    // (freemask & (1 << 1)): path
+    // (freemask & (1 << 2)): type
+    // (freemask & (1 << 3)): opts
+    char freemask;
+} getmntent_ret;
+
+// TODO: uid=getuid(), kind=0
 query_ret
-query(char* dev, int uid=getuid(), int kind=0) {
+quota_query(char* dev, int uid, int kind) {
       query_ret ret; 
 	  char *p = NULL;
 	  int err;
@@ -562,8 +569,9 @@ query(char* dev, int uid=getuid(), int kind=0) {
     return ret;
 }
 
+// TODO: timelimflag=0 kind=0
 int
-setqlim(char* dev, int uid, double bs, double bh, double fs, double fh, int timelimflag=0, int kind=0)
+quota_setqlim(char* dev, int uid, double bs, double bh, double fs, double fh, int timelimflag, int kind)
 {
     int RETVAL;
 	  if(timelimflag != 0)
@@ -740,8 +748,9 @@ setqlim(char* dev, int uid, double bs, double bh, double fs, double fh, int time
 	    return RETVAL;
 }
 
+// TODO: dev=NULL
 int
-sync(char* dev=NULL)
+quota_sync(char* dev)
 {
     int RETVAL;
 #ifndef NO_RPC
@@ -797,7 +806,7 @@ sync(char* dev=NULL)
           }
           else
 #endif
-	  RETVAL = linuxquota_sync (dev, false);
+	  RETVAL = linuxquota_sync (dev, 0);
 #else
 #ifdef Q_CTL_V2
 #ifdef AIX
@@ -840,30 +849,33 @@ sync(char* dev=NULL)
 }
 
 
-void
-rpcquery(char* host, char* path, int uid=getuid(), int kind=0)
+// TODO: uid=getuid() kind=0
+query_ret
+quota_rpcquery(char* host, char* path, int uid, int kind)
 {
+    query_ret ret;
 #ifndef NO_RPC
           struct quota_xs_nfs_rslt rslt;
           quota_rpc_strerror = NULL;
           if (getnfsquota(host, path, uid, kind, &rslt) == 0) {
-	    /* EXTEND(SP, 8); */
-            /* PUSHs(sv_2mortal(newSVnv(Q_DIV(rslt.bcur)))); */
-            /* PUSHs(sv_2mortal(newSVnv(Q_DIV(rslt.bsoft)))); */
-            /* PUSHs(sv_2mortal(newSVnv(Q_DIV(rslt.bhard)))); */
-            /* PUSHs(sv_2mortal(newSViv(rslt.btime))); */
-            /* PUSHs(sv_2mortal(newSVnv(rslt.fcur))); */
-            /* PUSHs(sv_2mortal(newSVnv(rslt.fsoft))); */
-            /* PUSHs(sv_2mortal(newSVnv(rslt.fhard))); */
-            /* PUSHs(sv_2mortal(newSViv(rslt.ftime))); */
+                ret.bc = rslt.bcur;
+                ret.bs = rslt.bsoft;
+                ret.bh = rslt.bhard;
+                ret.bt = rslt.btime;
+                ret.fc = rslt.fcur;
+                ret.fs = rslt.fsoft;
+                ret.fh = rslt.fhard;
+                ret.ft = rslt.ftime;
 	  }
 #else
 	  errno = ENOTSUP;
 #endif
+    return ret;
 }
 
+// TODO: port=0, use_tcp=false, timeout= RPC_DEFAULT_TIMEOUT
 void
-rpcpeer(unsigned int port=0, unsigned int use_tcp=false, unsigned int timeout=RPC_DEFAULT_TIMEOUT)
+quota_rpcpeer(unsigned int port, unsigned int use_tcp, unsigned int timeout)
 {
 #ifndef NO_RPC
           quota_rpc_strerror = NULL;
@@ -873,8 +885,9 @@ rpcpeer(unsigned int port=0, unsigned int use_tcp=false, unsigned int timeout=RP
 #endif
 }
 
+// TODO: uid=-1, gid=-1, hostname=NULL
 int
-rpcauth(int uid=-1, int gid=-1, char* hostname=NULL)
+quota_rpcauth(int uid, int gid, char* hostname)
 {
     // TODO: CHECK THIS RETVAL.
     int RETVAL;
@@ -913,7 +926,7 @@ rpcauth(int uid=-1, int gid=-1, char* hostname=NULL)
 }
 
 int
-setmntent()
+quota_setmntent()
 {
     int RETVAL;
 #ifndef NO_RPC
@@ -971,9 +984,11 @@ setmntent()
     return RETVAL;
 }
 
-void
-getmntent()
+getmntent_ret
+quota_getmntent()
 {
+    getmntent_ret ret;
+    ret.freemask = 0;
 #ifndef NO_RPC
           quota_rpc_strerror = NULL;
 #endif
@@ -984,11 +999,10 @@ getmntent()
 	  if(mtab != NULL) {
 	    mntp = getmntent(mtab);
 	    if(mntp != NULL) {
-	      /* EXTEND(SP, 4); */
-	      /* PUSHs(sv_2mortal(newSVpv(mntp->mnt_fsname, strlen(mntp->mnt_fsname)))); */
-	      /* PUSHs(sv_2mortal(newSVpv(mntp->mnt_dir, strlen(mntp->mnt_dir)))); */
-	      /* PUSHs(sv_2mortal(newSVpv(mntp->mnt_type, strlen(mntp->mnt_type)))); */
-	      /* PUSHs(sv_2mortal(newSVpv(mntp->mnt_opts, strlen(mntp->mnt_opts)))); */
+          ret.dev = mntp->mnt_fsname;
+	      ret.path = mntp->mnt_dir;
+	      ret.type = mntp->mnt_type;
+	      ret.opts = mntp->mnt_opts;
 	    }
 	  }
 	  else
@@ -997,11 +1011,10 @@ getmntent()
 	  struct mnttab mntp;
 	  if(mtab != NULL) {
 	    if(getmntent(mtab, &mntp) == 0)  {
-	      /* EXTEND(SP, 4); */
-	      /* PUSHs(sv_2mortal(newSVpv(mntp.mnt_special, strlen(mntp.mnt_special)))); */
-	      /* PUSHs(sv_2mortal(newSVpv(mntp.mnt_mountp, strlen(mntp.mnt_mountp)))); */
-	      /* PUSHs(sv_2mortal(newSVpv(mntp.mnt_fstype, strlen(mntp.mnt_fstype)))); */
-	      /* PUSHs(sv_2mortal(newSVpv(mntp.mnt_mntopts, strlen(mntp.mnt_mntopts)))); */
+	      ret.dev = mntp.mnt_special;
+	      ret.path = mntp.mnt_mountp;
+	      ret.type = mntp.mnt_fstype;
+	      ret.opts = mntp.mnt_mntopts;
 	    }
 	  }
 	  else
@@ -1009,24 +1022,29 @@ getmntent()
 #endif
 #else /* NO_MNTENT */
 	  if((mtab != NULL) && mtab_size) {
-	    /* EXTEND(SP,4); */
-	    /* PUSHs(sv_2mortal(newSVpv(mntp->f_mntfromname, strlen(mntp->f_mntfromname)))); */
-	    /* PUSHs(sv_2mortal(newSVpv(mntp->f_mntonname, strlen(mntp->f_mntonname)))); */
+	    ret.dev = mntp->f_mntfromname;
+	    ret.path = mntp->f_mntonname;
 #ifdef OSF_QUOTA
             char *fstype = getvfsbynumber((int)mntp->f_type);
             if (fstype != (char *) -1)
-              /* PUSHs(sv_2mortal(newSVpv(fstype, strlen(fstype)))); */
+              ret.type = fstype;
             else
 #endif
-              /* PUSHs(sv_2mortal(newSVpv(mntp->f_fstypename, strlen(mntp->f_fstypename)))); */
-            /* PUSHs(sv_2mortal(newSVpvf("%s%s%s%s%s%s%s", */
-              /*                          ((mntp->MNTINFO_FLAG_EL & MNT_LOCAL) ? "local" : "non-local"), */
-              /*                          ((mntp->MNTINFO_FLAG_EL & MNT_RDONLY) ? ",read-only" : ""), */
-              /*                          ((mntp->MNTINFO_FLAG_EL & MNT_SYNCHRONOUS) ? ",sync" : ""), */
-              /*                          ((mntp->MNTINFO_FLAG_EL & MNT_NOEXEC) ? ",noexec" : ""), */
-              /*                          ((mntp->MNTINFO_FLAG_EL & MNT_NOSUID) ? ",nosuid" : ""), */
-              /*                          ((mntp->MNTINFO_FLAG_EL & MNT_ASYNC) ? ",async" : ""), */
-              /*                          ((mntp->MNTINFO_FLAG_EL & MNT_QUOTA) ? ",quotas" : "")))); */
+              ret.type = mntp->f_fstypename, strlen(mntp->f_fstypename)))); */
+              
+
+            char* opts = malloc(52);
+            snprintf("%s%s%s%s%s%s%s",
+                ((mntp->MNTINFO_FLAG_EL & MNT_LOCAL) ? "local" : "non-local"),
+                ((mntp->MNTINFO_FLAG_EL & MNT_RDONLY) ? ",read-only" : ""),
+                ((mntp->MNTINFO_FLAG_EL & MNT_SYNCHRONOUS) ? ",sync" : ""),
+                ((mntp->MNTINFO_FLAG_EL & MNT_NOEXEC) ? ",noexec" : ""),
+                ((mntp->MNTINFO_FLAG_EL & MNT_NOSUID) ? ",nosuid" : ""),
+                ((mntp->MNTINFO_FLAG_EL & MNT_ASYNC) ? ",async" : ""),
+                ((mntp->MNTINFO_FLAG_EL & MNT_QUOTA) ? ",quotas" : ""))));
+            );
+            ret.opts = opts;
+            ret.freemask |= (1 << 3);
 	    mtab_size--;
 	    mntp++;
 	  }
@@ -1045,10 +1063,9 @@ getmntent()
 	    vmp = (struct vmount *) cp;
 	    aix_mtab_idx += 1;
 
-	    /* EXTEND(SP,4); */
 	    if ((vmp->vmt_gfstype != MNT_NFS) && (vmp->vmt_gfstype != MNT_NFS3)) {
 	      cp = vmt2dataptr(vmp, VMT_OBJECT);
-	      /* PUSHs(sv_2mortal(newSVpv(cp, strlen(cp)))); */
+          ret.dev = cp;
 	    }
 	    else {
 	      uchar *mp, *cp2;
@@ -1059,16 +1076,17 @@ getmntent()
 		strcpy(mp, cp);
 		strcat(mp, ":");
 		strcat(mp, cp2);
-	        /* PUSHs(sv_2mortal(newSVpv(mp, strlen(mp)))); */
-		free(mp);
+            ret.dev = mp;
+            ret.freemask |= (1 << 0);
 	      }
 	      else {
+            free(mp);
 	        cp = "?";
-	        /* PUSHs(sv_2mortal(newSVpv(cp, strlen(cp)))); */
+            ret.dev = cp;
 	      }
 	    }
 	    cp = vmt2dataptr(vmp, VMT_STUB);
-	    /* PUSHs(sv_2mortal(newSVpv(cp, strlen(cp)))); */
+        ret.path = cp;
 
 	    switch(vmp->vmt_gfstype) {
 	      case MNT_NFS:   cp = "nfs"; break;
@@ -1086,16 +1104,39 @@ getmntent()
 	      case MNT_CDROM: cp = "cdrom,ignore"; break;
 	      default:        cp = "unknown,ignore"; break;
 	    }
-	    PUSHs(sv_2mortal(newSVpv(cp, strlen(cp))));
+	    ret.type = cp;
 
 	    cp = vmt2dataptr(vmp, VMT_ARGS);
-	    PUSHs(sv_2mortal(newSVpv(cp, strlen(cp))));
+	    ret.opts = cp;
 	  }
 #endif
+
+    return ret;
 }
 
 void
-endmntent()
+quota_getmntent_free(getmntent_ret ret)
+{
+    if(ret.freemask & (1 << 0))
+    {
+        free(ret.dev);
+    }
+    if(ret.freemask & (1 << 1))
+    {
+        free(ret.path);
+    }
+    if(ret.freemask & (1 << 2))
+    {
+        free(ret.type);
+    }
+    if(ret.freemask & (1 << 3))
+    {
+        free(ret.opts);
+    }
+}
+
+void
+quota_endmntent()
 {
 #ifndef NO_RPC
           quota_rpc_strerror = NULL;
@@ -1118,7 +1159,7 @@ endmntent()
 }
 
 char *
-getqcargtype()
+quota_getqcargtype()
 {
     char* RETVAL;
 	static char ret[25];
@@ -1155,7 +1196,7 @@ getqcargtype()
 }
 
 const char *
-strerr() {
+quota_strerr() {
     const char* RETVAL;
 #ifndef NO_RPC
         if (quota_rpc_strerror != NULL)
