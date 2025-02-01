@@ -89,7 +89,7 @@ endif
 
 # Compiler and flags
 CC := gcc
-CFLAGS := -O2 -Wall $(EXTRAINC)
+CFLAGS := -O2 -Wall -fPIC $(EXTRAINC)
 LDFLAGS := $(RPCLIBS) $(EXTRALIBS)
 OBJECTS := Quota.o stdio_wrap.o $(AFSQUOTA) $(PICOBJ) $(EXTRAOBJ)
 
@@ -97,11 +97,17 @@ OBJECTS := Quota.o stdio_wrap.o $(AFSQUOTA) $(PICOBJ) $(EXTRAOBJ)
 .PHONY: all clean
 .DEFAULT_GOAL := all
 
-all: myconfig.h libquota.a
+all: myconfig.h libquota.so def.php
 
-libquota.a: $(OBJECTS)
-	ar rcs $@ $^
+libquota.so: $(OBJECTS)
+	$(CC) -shared $(LDFLAGS) -o $@ $^
+
+def.php: Quota.h
+	@echo "<?php" > def.php
+	@echo "const PHP_QUOTA_DEF = '" >> def.php
+	@sed 's/$$//' Quota.h | sed "s/'/\\'/g" >> def.php
+	@echo "';" >> def.php
 
 clean:
-	rm -f *.o libquota.a myconfig.h
+	rm -f *.o libquota.so myconfig.h def.php
 

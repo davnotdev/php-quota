@@ -1,3 +1,5 @@
+#include "Quota.h"
+
 #include <errno.h>
 #include <unistd.h>
 #include <stdio.h> 
@@ -341,31 +343,6 @@ xdr_ext_getquota_args(xdrs, objp)
 #endif /* USE_EXT_RQUOTA */
 
 #endif /* !NO_RPC */
-
-typedef struct {
-    uint64_t bc,
-             bs,
-             bh,
-             bt,
-             fc,
-             fs,
-             fh,
-             ft;
-} query_ret;
-
-typedef struct {
-    char *dev,
-         *path,
-         *type,
-         *opts;
-    // freemask stores which strings are "owned" by this object and need to be freed.
-    // 
-    // (freemask & (1 << 0)): dev
-    // (freemask & (1 << 1)): path
-    // (freemask & (1 << 2)): type
-    // (freemask & (1 << 3)): opts
-    char freemask;
-} getmntent_ret;
 
 // TODO: uid=getuid(), kind=0
 query_ret
@@ -1197,7 +1174,7 @@ quota_getqcargtype()
 
 const char *
 quota_strerr() {
-    const char* RETVAL;
+    const char* RETVAL = NULL;
 #ifndef NO_RPC
         if (quota_rpc_strerror != NULL)
           RETVAL = quota_rpc_strerror;
