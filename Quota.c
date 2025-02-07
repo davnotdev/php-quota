@@ -37,8 +37,6 @@ static struct vmount *mtab = NULL;
 static aix_mtab_idx, aix_mtab_count;
 #endif
 
-#define RPC_DEFAULT_TIMEOUT 4000
-
 #ifndef NO_RPC
 static struct
 {
@@ -344,7 +342,6 @@ xdr_ext_getquota_args(xdrs, objp)
 
 #endif /* !NO_RPC */
 
-// TODO: uid=getuid(), kind=0
 query_ret
 quota_query(char* dev, int uid, int kind) {
       query_ret ret; 
@@ -546,7 +543,6 @@ quota_query(char* dev, int uid, int kind) {
     return ret;
 }
 
-// TODO: timelimflag=0 kind=0
 int
 quota_setqlim(char* dev, int uid, double bs, double bh, double fs, double fh, int timelimflag, int kind)
 {
@@ -725,7 +721,6 @@ quota_setqlim(char* dev, int uid, double bs, double bh, double fs, double fh, in
 	    return RETVAL;
 }
 
-// TODO: dev=NULL
 int
 quota_sync(char* dev)
 {
@@ -826,7 +821,6 @@ quota_sync(char* dev)
 }
 
 
-// TODO: uid=getuid() kind=0
 query_ret
 quota_rpcquery(char* host, char* path, int uid, int kind)
 {
@@ -850,7 +844,6 @@ quota_rpcquery(char* host, char* path, int uid, int kind)
     return ret;
 }
 
-// TODO: port=0, use_tcp=false, timeout= RPC_DEFAULT_TIMEOUT
 void
 quota_rpcpeer(unsigned int port, unsigned int use_tcp, unsigned int timeout)
 {
@@ -862,12 +855,11 @@ quota_rpcpeer(unsigned int port, unsigned int use_tcp, unsigned int timeout)
 #endif
 }
 
-// TODO: uid=-1, gid=-1, hostname=NULL
 int
 quota_rpcauth(int uid, int gid, char* hostname)
 {
     // TODO: CHECK THIS RETVAL.
-    int RETVAL;
+    int RETVAL = -1;
 #ifndef NO_RPC
           quota_rpc_strerror = NULL;
           if ((uid == -1) && (gid == -1) && (hostname==NULL)) {
@@ -1176,28 +1168,29 @@ const char *
 quota_strerr() {
     const char* RETVAL = NULL;
 #ifndef NO_RPC
-        if (quota_rpc_strerror != NULL)
-          RETVAL = quota_rpc_strerror;
-        else
+    if (quota_rpc_strerror != NULL)
+      RETVAL = quota_rpc_strerror;
+    else
 #endif
-        // ENOENT for (XFS): "No quota for this user"
-        if((errno == EINVAL) || (errno == ENOTTY) || (errno == ENOENT) || (errno == ENOSYS))
-          RETVAL = "No quotas on this system";
-        else if(errno == ENODEV)
-          RETVAL = "Not a standard file system";
-        else if(errno == EPERM)
-          RETVAL = "Not privileged";
-        else if(errno == EACCES)
-          RETVAL = "Access denied";
-        else if(errno == ESRCH)
+    // ENOENT for (XFS): "No quota for this user"
+    if((errno == EINVAL) || (errno == ENOTTY) || (errno == ENOENT) || (errno == ENOSYS))
+      RETVAL = "No quotas on this system";
+    else if(errno == ENODEV)
+      RETVAL = "Not a standard file system";
+    else if(errno == EPERM)
+      RETVAL = "Not privileged";
+    else if(errno == EACCES)
+      RETVAL = "Access denied";
+    else if(errno == ESRCH)
 #ifdef Q_CTL_V3  /* Linux */
-          RETVAL = "Quotas not enabled, no quota for this user";
+      RETVAL = "Quotas not enabled, no quota for this user";
 #else
-          RETVAL = "No quota for this user";
+      RETVAL = "No quota for this user";
 #endif
-        else if(errno == EUSERS)
-          RETVAL = "Quota table overflow";
-        else
-          RETVAL = strerror(errno);
+    else if(errno == EUSERS)
+      RETVAL = "Quota table overflow";
+    else
+      RETVAL = strerror(errno);
+    errno = 0;
 	return RETVAL;
 }

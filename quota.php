@@ -34,91 +34,108 @@ class PHPQuota
 {
     protected $ffi;
 
-    # SAFETY: Returned Data Must be Freed.
+    const RPC_DEFAULT_TIMEOUT = 4000;
+
     static private function phpStringToFFI(string $s): FFI\CData {
-        $d = FFI::new("char[" . (strlen($s) + 1) . "]");
-        FFI::memcpy($d, $s, strlen($s) + 1);        
+        $csize = strlen($s) + 1;
+        $d = FFI::new("char[" . $csize . "]");
+        FFI::memset($d, 0, $csize);
+        FFI::memcpy($d, $s, $csize - 1);
         return $d;
+    }
+
+    private function checkError(): void {
+        $maybeErr = $this->ffi->quota_strerr();
+        if (!empty($maybeErr) && $maybeErr != "Success") {
+            throw new Exception($maybeErr);
+        }
     }
 
     function __construct(string $library_dir = __DIR__ . "/libquota.so")
     {
-        $ffi = FFI::cdef(PHP_QUOTA_DEF, $library_dir);
+        $this->ffi = FFI::cdef(PHP_QUOTA_DEF, $library_dir);
     }
 
-    function query(string $dev, int $uid, int $kind): QueryRet
+    function query(string $dev, int | null $uid = null, int $kind = 0): QueryRet
     {
+        $uid = $uid ?? posix_getuid();
+
         $dev = PHPQuota::phpStringToFFI($dev);
-        $query_ret = $this->ffi->quota_query($dev, $uid, $kind);
-        FFI::free($dev);
+        $queryRet = $this->ffi->quota_query($dev, $uid, $kind);
+        $this->checkError();
 
         return new QueryRet(
-            $query_ret->bc,
-            $query_ret->bs,
-            $query_ret->bh,
-            $query_ret->bt,
-            $query_ret->fc,
-            $query_ret->fs,
-            $query_ret->fh,
-            $query_ret->ft,
+            $queryRet->bc,
+            $queryRet->bs,
+            $queryRet->bh,
+            $queryRet->bt,
+            $queryRet->fc,
+            $queryRet->fs,
+            $queryRet->fh,
+            $queryRet->ft,
         );
     }
 
-    function setqlim(string $dev, int $uid, float $bs, float $bh, float $fs, float $fh, int $timelimflag, int $kind): int
+    function setqlim(string $dev, int | null $uid, float $bs, float $bh, float $fs, float $fh, int $timelimflag = 0, int $kind = 0): int
     {
+        $uid = $uid ?? posix_getuid();
+
         $dev = PHPQuota::phpStringToFFI($dev);
         $ret = $this->ffi->quota_setqlim($dev, $uid, $bs, $bh, $fs, $fh, $timelimflag, $kind);
-        FFI::free($dev);
+        $this->checkError();
         
         return $ret;
     }
 
-    function sync(string $dev): int
+    function sync(string $dev = ""): int
     {
         $dev = PHPQuota::phpStringToFFI($dev);
-        $ret = $this->ffi->quota_sync(dev);
-        FFI::free($dev);
+        $ret = $this->ffi->quota_sync($dev);
+        $this->checkError();
 
         return $ret;
     }
 
-    // TODO: uid=getuid() kind=0
-    function rpcquery(string $host, string $path, int $uid, int $kind): QueryRet
+    function rpcquery(string $host, string $path, int | null $uid = null, int $kind = 0): QueryRet
     {
+        $uid = $uid ?? posix_getuid();
+
         $host = PHPQuota::phpStringToFFI($host);
         $path = PHPQuota::phpStringToFFI($path);
-        $query_ret = $this->ffi->quota_rpcquery($host, $path, $uid, $kind);
-        FFI::free($host);
-        FFI::free($path);
+        $queryRet = $this->ffi->quota_rpcquery($host, $path, $uid, $kind);
+        $this->checkError();
         
         return new QueryRet(
-            $query_ret->bc,
-            $query_ret->bs,
-            $query_ret->bh,
-            $query_ret->bt,
-            $query_ret->fc,
-            $query_ret->fs,
-            $query_ret->fh,
-            $query_ret->ft,
+            $queryRet->bc,
+            $queryRet->bs,
+            $queryRet->bh,
+            $queryRet->bt,
+            $queryRet->fc,
+            $queryRet->fs,
+            $queryRet->fh,
+            $queryRet->ft,
         );
     }
 
-    function rpcpeer(int $port, int $use_tcp, int $timeout): void
+    function rpcpeer(int $port = 0, bool $use_tcp = false, int $timeout = RPC_DEFAULT_TIMEOUT): void
     {
         $this->ffi->quota_rpcpeer($port, $use_tcp, $timeout);
     }
 
-    function rpcauth(int $uid, int $gid, string $hostname): int
+    function rpcauth(int $uid = -1, int $gid = -1, string $hostname = ""): int
     {
         $hostname = PHPQuota::phpStringToFFI($hostname);
         $ret = $this->ffi->quota_rpcauth($uid, $gid, $hostname);
-        FFI::free($hostname);
+        $this->checkError();
+
         return $ret;
     }
 
     function setmntent(): int
     {
-        return $this->ffi->quota_setmntent();
+        $ret = $this->ffi->quota_setmntent();
+        $this->checkError();
+        return $ret;
     }
 
     function getmntent(): GetMntentRet
@@ -131,6 +148,7 @@ class PHPQuota
             FFI::string($getmntent_ret->opts)
         );
         $this->ffi->quota_getmntent_free($getmntent_ret);
+        $this->checkError();
         
         return $ret;
     }
@@ -138,21 +156,14 @@ class PHPQuota
     function endmntent(): void
     {
         $this->ffi->quota_endmntent();
+        $this->checkError();
     }
 
     function getqcargtype(): string
     {
         $ret = $this->ffi->quota_getqcargtype();
+        $this->checkError();
         return FFI::string($ret);
     }
-
-    // TODO: Handle int errors and strerrs
-    private function strerr(): string
-    {
-        // TODO: This may be null.
-        $ret = $this->ffi->quota_strerr();
-        return FFI::string($ret);
-    }
-
 }
 

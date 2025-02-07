@@ -28,33 +28,17 @@ typedef struct getmntent_ret {
     char freemask;
 } getmntent_ret;
 
-// TODO: uid=getuid(), kind=0
 query_ret quota_query(char* dev, int uid, int kind);
-
-// TODO: timelimflag=0 kind=0
 int quota_setqlim(char* dev, int uid, double bs, double bh, double fs, double fh, int timelimflag, int kind);
-
-// TODO: dev=NULL
 int quota_sync(char* dev);
-
-// TODO: uid=getuid() kind=0
 query_ret quota_rpcquery(char* host, char* path, int uid, int kind);
-
-// TODO: port=0, use_tcp=false, timeout= RPC_DEFAULT_TIMEOUT
 void quota_rpcpeer(unsigned int port, unsigned int use_tcp, unsigned int timeout);
-
-// TODO: uid=-1, gid=-1, hostname=NULL
 int quota_rpcauth(int uid, int gid, char* hostname);
-
 int quota_setmntent();
-
 getmntent_ret quota_getmntent();
 void quota_getmntent_free(getmntent_ret ret);
-
 void quota_endmntent();
-
 char * quota_getqcargtype();
-
 const char * quota_strerr();
 
 #endif
