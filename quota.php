@@ -30,6 +30,69 @@ class GetMntentRet
     }
 }
 
+/**
+ * @implements Iterator<int, GetMntentRet>
+ */
+class GetMntent implements Iterator
+{
+    private $valid = true;
+    private $position = 0;
+    private $array = array();
+    private PHPQuota $phpQuota;
+
+    public function __construct(PHPQuota $phpQuota) {
+        $this->phpQuota = $phpQuota;
+        $this->position = 0;
+
+        $phpQuota->setmntentRaw();
+        $this->next();
+    }
+
+    /**
+     * @return void
+     */
+    public function __destruct() {
+        $this->phpQuota->endmntentRaw();
+    }
+
+    public function rewind(): void {
+        if ($this->position > 0) {
+            $this->position--;
+        }
+    }
+
+    public function current(): GetMntentRet {
+        return $this->array[$this->position];
+    }
+
+    public function key(): int {
+        return $this->position;
+    }
+
+    public function next(): void {
+        if (!$this->valid) {
+            return;
+        }
+
+        if ($this->position < count($this->array) - 1) {
+            $this->position++;
+            return;
+        }
+
+        $ret = $this->phpQuota->getmntentRaw();
+        if ($ret == null) {
+            $this->valid = false;
+        } else {
+            array_push($this->array, $ret);
+            $this->position++;
+        }
+    }
+
+    public function valid(): bool {
+        return $this->valid;
+    }
+}
+
 class PHPQuota
 {
     protected $ffi;
@@ -131,32 +194,47 @@ class PHPQuota
         return $ret;
     }
 
-    function setmntent(): int
+    function setmntentRaw(): int
     {
         $ret = $this->ffi->quota_setmntent();
         $this->checkError();
         return $ret;
     }
 
-    function getmntent(): GetMntentRet
+    function getmntentRaw(): GetMntentRet | null
     {
         $getmntent_ret = $this->ffi->quota_getmntent();
-        $ret = new GetMntentRet(
-            FFI::string($getmntent_ret->dev),
-            FFI::string($getmntent_ret->path),
-            FFI::string($getmntent_ret->type),
-            FFI::string($getmntent_ret->opts)
-        );
-        $this->ffi->quota_getmntent_free($getmntent_ret);
-        $this->checkError();
-        
-        return $ret;
+        if (
+            is_null($getmntent_ret->dev) || 
+            is_null($getmntent_ret->path) ||
+            is_null($getmntent_ret->type) ||
+            is_null($getmntent_ret->opts)
+        ) {
+            $this->ffi->quota_getmntent_free($getmntent_ret);
+            $this->checkError();
+            return null;
+        } else {
+            $ret = new GetMntentRet(
+                FFI::string($getmntent_ret->dev),
+                FFI::string($getmntent_ret->path),
+                FFI::string($getmntent_ret->type),
+                FFI::string($getmntent_ret->opts)
+            );
+            $this->ffi->quota_getmntent_free($getmntent_ret);
+            $this->checkError();
+            
+            return $ret;
+        }
     }
 
-    function endmntent(): void
+    function endmntentRaw(): void
     {
         $this->ffi->quota_endmntent();
         $this->checkError();
+    }
+
+    function getmntent(): GetMntent {
+        return new GetMntent($this);
     }
 
     function getqcargtype(): string

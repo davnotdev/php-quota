@@ -15,10 +15,10 @@ typedef struct query_ret {
 } query_ret;
 
 typedef struct getmntent_ret {
-    char *dev,
-         *path,
-         *type,
-         *opts;
+    char *dev;
+    char *path;
+    char *type;
+    char *opts;
     // freemask stores which strings are "owned" by this object and need to be freed.
     // 
     // (freemask & (1 << 0)): dev
