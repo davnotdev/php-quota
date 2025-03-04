@@ -1272,7 +1272,6 @@ quota_endmntent ()
 char *
 quota_getqcargtype ()
 {
-  char *ret;
   static char ret[25];
 #if defined(USE_IOCTL) || defined(QCARG_MNTPT)
   strcpy (ret, "mntpt");
@@ -1302,7 +1301,6 @@ quota_getqcargtype ()
 #ifdef SOLARIS_VXFS
   strcat (ret, ",VXFS");
 #endif
-  ret = ret;
   return ret;
 }
 
