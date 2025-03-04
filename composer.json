@@ -1,0 +1,18 @@
+
+{
+    "name": "davnotdev/php-quota",
+    "description": "PHP port of Perl-Quota for manipulating UNIX filesystem quotas",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "David Zhong"
+        }
+    ],
+    "require": {
+        "php": ">=7.4.0",
+        "ext-ffi": "*"
+    },
+    "scripts": {
+        "pre-command-run": "make"
+    }
+}
