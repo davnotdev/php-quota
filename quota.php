@@ -2,6 +2,11 @@
 
 include("def.php");
 
+enum QuotaType: int {
+    case User = 0;
+    case Group = 1;
+}
+
 class QueryRet
 {
     public int $bc, $bs, $bh, $bt, $fc, $fs, $fh, $ft;
@@ -15,6 +20,38 @@ class QueryRet
         $this->fs = $fs;
         $this->fh = $fh;
         $this->ft = $ft;
+    }
+  
+    function getBlockUsage(): int {
+        return $this->bc;
+    }
+
+    function getBlockSoftLimit(): int {
+        return $this->bs;
+    }
+
+    function getBlockHardLimit(): int {
+        return $this->bh;
+    }
+
+    function getBlockTimeLimit(): int {
+        return $this->bt;
+    }
+
+    function getFileUsage(): int {
+        return $this->fc;
+    }
+
+    function getFileSoftLimit(): int {
+        return $this->fs;
+    }
+
+    function getFileHardLimit(): int {
+        return $this->fh;
+    }
+
+    function getFileTimeLimit(): int {
+        return $this->ft;
     }
 }
 
@@ -119,12 +156,12 @@ class PHPQuota
         $this->ffi = FFI::cdef(PHP_QUOTA_DEF, $library_dir);
     }
 
-    function query(string $dev, int | null $uid = null, int $kind = 0): QueryRet
+    function query(string $dev, int | null $uid = null, QuotaType $kind = QuotaType::User): QueryRet
     {
         $uid = $uid ?? posix_getuid();
 
         $dev = PHPQuota::phpStringToFFI($dev);
-        $queryRet = $this->ffi->quota_query($dev, $uid, $kind);
+        $queryRet = $this->ffi->quota_query($dev, $uid, $kind->value);
         $this->checkError();
 
         return new QueryRet(
@@ -139,12 +176,12 @@ class PHPQuota
         );
     }
 
-    function setqlim(string $dev, int | null $uid, float $bs, float $bh, float $fs, float $fh, int $timelimflag = 0, int $kind = 0): int
+    function setqlim(string $dev, int | null $uid, float $bs, float $bh, float $fs, float $fh, int $timelimflag = 0, QuotaType $kind = QuotaType::User): int
     {
         $uid = $uid ?? posix_getuid();
 
         $dev = PHPQuota::phpStringToFFI($dev);
-        $ret = $this->ffi->quota_setqlim($dev, $uid, $bs, $bh, $fs, $fh, $timelimflag, $kind);
+        $ret = $this->ffi->quota_setqlim($dev, $uid, $bs, $bh, $fs, $fh, $timelimflag, $kind->value);
         $this->checkError();
         
         return $ret;
@@ -159,13 +196,13 @@ class PHPQuota
         return $ret;
     }
 
-    function rpcquery(string $host, string $path, int | null $uid = null, int $kind = 0): QueryRet
+    function rpcquery(string $host, string $path, int | null $uid = null, QuotaType $kind = QuotaType::User): QueryRet
     {
         $uid = $uid ?? posix_getuid();
 
         $host = PHPQuota::phpStringToFFI($host);
         $path = PHPQuota::phpStringToFFI($path);
-        $queryRet = $this->ffi->quota_rpcquery($host, $path, $uid, $kind);
+        $queryRet = $this->ffi->quota_rpcquery($host, $path, $uid, $kind->value);
         $this->checkError();
         
         return new QueryRet(

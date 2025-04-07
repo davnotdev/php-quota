@@ -5,6 +5,11 @@ const PHP_QUOTA_DEF = '
 
 #include <stdint.h>
 
+typedef enum quota_type {
+    PHP_QUOTA_TYPE_USER = 0,
+    PHP_QUOTA_TYPE_GROUP = 1,
+} quota_type;
+
 typedef struct query_ret
 {
   uint64_t bc, bs, bh, bt, fc, fs, fh, ft;
@@ -26,12 +31,13 @@ typedef struct getmntent_ret
   char freemask;
 } getmntent_ret;
 
-query_ret quota_query (char *dev, int uid, int kind);
+// TODO: enum or bool for kind
+query_ret quota_query (char *dev, int uid, quota_type kind);
 int quota_setqlim (char *dev, int uid, double bs, double bh, double fs,
-                   double fh, int timelimflag, int kind);
+                   double fh, int timelimflag, quota_type kind);
 int quota_sync (char *dev);
 
-query_ret quota_rpcquery (char *host, char *path, int uid, int kind);
+query_ret quota_rpcquery (char *host, char *path, int uid, quota_type kind);
 void quota_rpcpeer (unsigned int port, unsigned int use_tcp,
                     unsigned int timeout);
 

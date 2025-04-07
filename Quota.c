@@ -358,7 +358,7 @@ ext_getquota_args *objp;
 #endif /* !NO_RPC */
 
 query_ret
-quota_query (char *dev, int uid, int kind)
+quota_query (char *dev, int uid, quota_type kind)
 {
   query_ret ret;
   char *p = NULL;
@@ -590,7 +590,7 @@ quota_query (char *dev, int uid, int kind)
 
 int
 quota_setqlim (char *dev, int uid, double bs, double bh, double fs, double fh,
-               int timelimflag, int kind)
+               int timelimflag, quota_type kind)
 {
   int ret;
   if (timelimflag != 0)
@@ -916,7 +916,7 @@ quota_sync (char *dev)
 }
 
 query_ret
-quota_rpcquery (char *host, char *path, int uid, int kind)
+quota_rpcquery (char *host, char *path, int uid, quota_type kind)
 {
   query_ret ret;
 #ifndef NO_RPC
