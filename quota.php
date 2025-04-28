@@ -217,13 +217,15 @@ class PHPQuota
         );
     }
 
-    function rpcpeer(int $port = 0, bool $use_tcp = false, int $timeout = RPC_DEFAULT_TIMEOUT): void
+    function rpcpeer(int $port = 0, bool $use_tcp = false, int $timeout = self::RPC_DEFAULT_TIMEOUT): void
     {
         $this->ffi->quota_rpcpeer($port, $use_tcp, $timeout);
     }
 
-    function rpcauth(int $uid = -1, int $gid = -1, string $hostname = ""): int
+    function rpcauth(int | null $uid = null, int | null $gid = null, string $hostname = ""): int
     {
+        $uid = $uid ?? posix_getuid();
+        $gid = $gid ?? posix_getgid();
         $hostname = PHPQuota::phpStringToFFI($hostname);
         $ret = $this->ffi->quota_rpcauth($uid, $gid, $hostname);
         $this->checkError();
